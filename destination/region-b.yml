@@ -194,7 +194,7 @@ Resources:
               RecoveryPointArn=destinationRecoveryPointArn,
               SourceBackupVaultName='central-backup-vault',
               DestinationBackupVaultArn='arn:aws:backup:${PrimaryRegion}:${AWS::AccountId}:backup-vault:central-backup-vault',
-              IamRoleArn=${BackupIAMRole.Arn}
+              IamRoleArn='${BackupIAMRole.Arn}'
             )
             print(f'start_copy_job done : {response}')
           except Exception as e:

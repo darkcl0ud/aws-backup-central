@@ -128,6 +128,7 @@ Resources:
                 - events:PutEvents
               Resource:
                 - !Sub arn:aws:events:${SecondaryRegion}:${AWS::AccountId}:event-bus/default
+                - !Sub arn:aws:events:${SecondaryRegion}:${CentralBackupAccountId}:event-bus/default
           PolicyName: eventbridge-bus-access
       Tags: 
         - Key: project
