@@ -187,7 +187,7 @@ Resources:
             - Effect: Allow
               Action:
                 - iam:PassRole
-              Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/service-role/AWSBackupDefaultServiceRole
+              Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/rds-backup-role
         - PolicyName: backup-permissions
           PolicyDocument:
             Version: '2012-10-17'
@@ -212,7 +212,7 @@ Resources:
                 state:
                   - COMPLETED
                 destinationBackupVaultArn:
-                  - !Ref Vault
+                  - !GetAtt Vault.BackupVaultArn
               detail-type:
                 - Copy Job State Change
               source: 
