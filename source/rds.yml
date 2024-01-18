@@ -1,0 +1,247 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  KMSKeyId:
+    Type: String
+  CentralBackupAccountId:
+    Type: String
+  AccountEnvironment:
+    Type: String
+    AllowedValues:
+      - production
+      - development
+  PrimaryRegion:
+    Type: String
+  SecondaryRegion:
+    Type: String
+  OrgId:
+    Type: String
+Mappings:
+  Retention:
+    Primary:
+      development: 15
+      production: 30
+    Secondary:
+      development: 5
+      production: 5
+Conditions:
+  IsPrimaryRegion: !Equals
+    - !Ref AWS::Region
+    - !Ref PrimaryRegion
+  IsNotPrimaryRegion: !Not 
+    - !Equals
+      - !Ref AWS::Region
+      - !Ref PrimaryRegion
+Resources:
+  Vault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      AccessPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Enable backup vault access
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - backup:CopyFromBackupVault
+              - backup:CopyIntoBackupVault
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:PrincipalOrgID: !Ref OrgId
+      BackupVaultName: !Sub source-rds-${AWS::Region}
+      BackupVaultTags:
+        project: backup
+      EncryptionKeyArn: !Sub arn:aws:kms:${AWS::Region}:${CentralBackupAccountId}:key/${KMSKeyId}
+  BackupPlan:
+    Condition: IsPrimaryRegion
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: rds-backup
+        BackupPlanRule: 
+          - CompletionWindowMinutes: 120
+            StartWindowMinutes: 60
+            CopyActions: 
+              - DestinationBackupVaultArn: !Sub arn:aws:backup:${SecondaryRegion}:${AWS::AccountId}:backup-vault:source-rds-${SecondaryRegion}
+            EnableContinuousBackup: false
+            Lifecycle: 
+              DeleteAfterDays: !FindInMap [Retention, Primary, !Ref AccountEnvironment]
+            RecoveryPointTags: 
+              account: !Ref AWS::AccountId
+            RuleName: rds-backup
+            ScheduleExpression: cron(0 4/12 * * ? *)
+            TargetBackupVault: !Ref Vault
+      BackupPlanTags: 
+        project: backup
+  BackupIAMRole:
+    Condition: IsPrimaryRegion
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: backup.amazonaws.com
+          Action: sts:AssumeRole
+      Description: Role for aws backup on rds backups
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores
+      MaxSessionDuration: 3600
+      RoleName: rds-backup-role
+      Tags: 
+        - Key: project
+          Value: backup
+  BackupAllRDS:
+    Condition: IsPrimaryRegion
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref BackupPlan
+      BackupSelection: 
+          IamRoleArn: !GetAtt BackupIAMRole.Arn
+          Resources: 
+            - !Sub arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:*
+          SelectionName: any-rds
+  EventBridgeRole:
+    Condition: IsPrimaryRegion
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: backup-copy-complete-event-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: events.amazonaws.com
+          Action: sts:AssumeRole
+      MaxSessionDuration: 3600
+      Policies:
+        - PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              Effect: Allow
+              Action:
+                - events:PutEvents
+              Resource:
+                - !Sub arn:aws:events:${SecondaryRegion}:${AWS::AccountId}:event-bus/default
+          PolicyName: eventbridge-bus-access
+      Tags: 
+        - Key: project
+          Value: backup
+  EventBridgeRule:
+    Condition: IsPrimaryRegion
+    Type: AWS::Events::Rule
+    Properties:
+      Name: AWSBackupCopyCompleteRule
+      Description: Event Rule for AWS Backup Copy Job Complete Event RDS
+      EventPattern:
+        source:
+          - aws.backup
+        detail-type: 
+          - Copy Job State Change
+        detail: 
+          state:
+            - COMPLETED
+          destinationBackupVaultArn:
+            - prefix: !Sub arn:aws:backup:${SecondaryRegion}:${AWS::AccountId}
+      State: ENABLED
+      Targets: 
+        - Arn: !Sub arn:aws:events:${SecondaryRegion}:${AWS::AccountId}:event-bus/default
+          RoleArn: !GetAtt EventBridgeRole.Arn
+          Id: SendToEventBus
+      EventBusName: 'default'
+  LambdaRole:
+    Condition: IsNotPrimaryRegion
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-rds-backup-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: 
+              - lambda.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+      Policies:
+        - PolicyName: lambda-logging-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - arn:aws:logs:*:*:*
+        - PolicyName: pass-backup-role-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - iam:PassRole
+              Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/service-role/AWSBackupDefaultServiceRole
+        - PolicyName: backup-permissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - backup:StartCopyJob
+                - backup:ListTags
+                - backup:DescribeRecoveryPoint
+              Resource: '*'
+  CrossAccountBackupCopyLambda:
+    Condition: IsNotPrimaryRegion
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Lambda function to automate copy of resources to central backup account
+      Events:
+        EBBackupRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail:
+                state:
+                  - COMPLETED
+                destinationBackupVaultArn:
+                  - !Ref Vault
+              detail-type:
+                - Copy Job State Change
+              source: 
+                - aws.backup
+            RetryPolicy:
+              MaximumRetryAttempts: 3
+              MaximumEventAgeInSeconds: 900
+      FunctionName: backup-rds-cross-account
+      Handler: index.app
+      InlineCode: !Sub |
+        import boto3, logging
+        def app(event, context):
+          try:
+            print(f'Processing Event : {event}')
+            eventDetail = event.get('detail')
+            iamRoleArn = eventDetail.get('iamRoleArn')
+            destinationRecoveryPointArn = eventDetail.get('destinationRecoveryPointArn')
+            backup = boto3.client('backup')
+            response = backup.start_copy_job(
+              RecoveryPointArn=destinationRecoveryPointArn,
+              SourceBackupVaultName='source-rds-${AWS::Region}',
+              DestinationBackupVaultArn='arn:aws:backup:${AWS::Region}:${CentralBackupAccountId}:backup-vault:central-backup-vault',
+              IamRoleArn=iamRoleArn
+            )
+            print(f'start_copy_job done : {response}')
+          except Exception as e:
+            logging.error(e)
+      MemorySize: 256
+      PackageType: Zip
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.11
+      Timeout: 300
