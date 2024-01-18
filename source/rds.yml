@@ -64,6 +64,8 @@ Resources:
             StartWindowMinutes: 60
             CopyActions: 
               - DestinationBackupVaultArn: !Sub arn:aws:backup:${SecondaryRegion}:${AWS::AccountId}:backup-vault:source-rds-${SecondaryRegion}
+                Lifecycle:
+                  DeleteAfterDays: 1
             EnableContinuousBackup: false
             Lifecycle: 
               DeleteAfterDays: !FindInMap [Retention, Primary, !Ref AccountEnvironment]
@@ -131,10 +133,9 @@ Resources:
         - Key: project
           Value: backup
   EventBridgeRule:
-    Condition: IsPrimaryRegion
     Type: AWS::Events::Rule
     Properties:
-      Name: AWSBackupCopyCompleteRule
+      Name: backup-complete-rds-rule
       Description: Event Rule for AWS Backup Copy Job Complete Event RDS
       EventPattern:
         source:
@@ -145,11 +146,17 @@ Resources:
           state:
             - COMPLETED
           destinationBackupVaultArn:
-            - prefix: !Sub arn:aws:backup:${SecondaryRegion}:${AWS::AccountId}
+            - prefix: !If 
+              - IsPrimaryRegion
+              - !Sub arn:aws:backup:${SecondaryRegion}:${AWS::AccountId}
+              - !Sub arn:aws:backup:${SecondaryRegion}:${CentralBackupAccountId}
       State: ENABLED
       Targets: 
-        - Arn: !Sub arn:aws:events:${SecondaryRegion}:${AWS::AccountId}:event-bus/default
-          RoleArn: !GetAtt EventBridgeRole.Arn
+        - Arn: !If 
+          - IsPrimaryRegion
+          - !Sub arn:aws:events:${SecondaryRegion}:${AWS::AccountId}:event-bus/default
+          - !Sub arn:aws:events:${SecondaryRegion}:${CentralBackupAccountId}:event-bus/default
+          RoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/backup-copy-complete-event-role
           Id: SendToEventBus
       EventBusName: 'default'
   LambdaRole:
@@ -235,7 +242,10 @@ Resources:
               RecoveryPointArn=destinationRecoveryPointArn,
               SourceBackupVaultName='source-rds-${AWS::Region}',
               DestinationBackupVaultArn='arn:aws:backup:${AWS::Region}:${CentralBackupAccountId}:backup-vault:central-backup-vault',
-              IamRoleArn=iamRoleArn
+              IamRoleArn=iamRoleArn,
+              Lifecycle={
+                  'DeleteAfterDays': 1
+              }
             )
             print(f'start_copy_job done : {response}')
           except Exception as e:
