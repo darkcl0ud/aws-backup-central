@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  KMSKeyId:
+    Type: String
+  CentralBackupAccountId:
+    Type: String
+  AccountEnvironment:
+    Type: String
+    AllowedValues:
+      - production
+      - development
+  OrgId:
+    Type: String
+Mappings:
+  Retention:
+    Primary:
+      development: 15
+      production: 30
+    Secondary:
+      development: 5
+      production: 5
+Resources:
+  Vault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      AccessPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Enable backup vault access
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - backup:CopyFromBackupVault
+              - backup:CopyIntoBackupVault
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:PrincipalOrgID: !Ref OrgId
+      BackupVaultName: !Sub source-dynamodb
+      BackupVaultTags:
+        project: backup
+      EncryptionKeyArn: !Sub arn:aws:kms:${AWS::Region}:${CentralBackupAccountId}:key/${KMSKeyId}
+  BackupPlan:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: dynamodb-backup
+        BackupPlanRule: 
+          - CompletionWindowMinutes: 120
+            StartWindowMinutes: 60
+            CopyActions: 
+              - DestinationBackupVaultArn: !Sub arn:aws:backup:${AWS::Region}:${AWS::AccountId}:backup-vault:source-dynamodb-${AWS::Region}
+                Lifecycle:
+                  DeleteAfterDays: 1
+            EnableContinuousBackup: false
+            Lifecycle: 
+              DeleteAfterDays: !FindInMap [Retention, Primary, !Ref AccountEnvironment]
+            RecoveryPointTags: 
+              account: !Ref AWS::AccountId
+            RuleName: dynamodb-backup
+            ScheduleExpression: cron(0 4/12 * * ? *)
+            TargetBackupVault: !Ref Vault
+      BackupPlanTags: 
+        project: backup
+  BackupIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: backup.amazonaws.com
+          Action: sts:AssumeRole
+      Description: Role for aws backup on dynamodb backups
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores
+      MaxSessionDuration: 3600
+      RoleName: dynamodb-backup-role
+      Tags: 
+        - Key: project
+          Value: backup
+  BackupAllDynamoDB:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref BackupPlan
+      BackupSelection: 
+          IamRoleArn: !GetAtt BackupIAMRole.Arn
+          Resources: 
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*
+          SelectionName: any-dynamodb
