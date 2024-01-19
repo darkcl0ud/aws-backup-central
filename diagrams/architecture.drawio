@@ -1,4 +1,4 @@
-<mxfile host="Electron" modified="2024-01-18T22:32:44.857Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.18 Chrome/120.0.6099.199 Electron/28.1.2 Safari/537.36" etag="0v0lvHIf4OPgYg9PeiQv" version="22.1.18" type="device" pages="5">
+<mxfile host="Electron" modified="2024-01-19T00:43:37.141Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.18 Chrome/120.0.6099.199 Electron/28.1.2 Safari/537.36" etag="86Q719eVuj8r8jw4kJJN" version="22.1.18" type="device" pages="5">
   <diagram name="RDS (SERVICES)" id="Y-YWKFSALTrDVyYFYQZ8">
     <mxGraphModel dx="1368" dy="1029" grid="1" gridSize="14" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
@@ -245,7 +245,7 @@
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="7siEohiGBmgsL0OykUzM-1" value="AWS Organization" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#232F3E;dashed=0;" vertex="1" parent="1">
-          <mxGeometry x="56" y="56" width="672" height="728" as="geometry" />
+          <mxGeometry x="248" y="56" width="672" height="728" as="geometry" />
         </mxCell>
         <mxCell id="7siEohiGBmgsL0OykUzM-2" value="Development Account" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_account;strokeColor=#CD2264;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#CD2264;dashed=0;" vertex="1" parent="7siEohiGBmgsL0OykUzM-1">
           <mxGeometry x="56" y="42" width="560" height="322" as="geometry" />
@@ -479,7 +479,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="fJgRNkC1e6lgnJDyuj4X" name="Service Opt In">
-    <mxGraphModel dx="2280" dy="1716" grid="1" gridSize="14" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+    <mxGraphModel dx="892" dy="671" grid="1" gridSize="14" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />

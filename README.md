@@ -11,3 +11,5 @@ Deployment order:
 Under settings in AWS Backup:
 - Enable both RDS and DynamoDB in __'Service opt-in'__
 - Enable DynamoDB __'Advanced features'__ in __'Advanced features for Amazon DynamoDB backups - new'__
+
+## RDS
