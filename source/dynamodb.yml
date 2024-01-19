@@ -50,9 +50,7 @@ Resources:
           - CompletionWindowMinutes: 120
             StartWindowMinutes: 60
             CopyActions: 
-              - DestinationBackupVaultArn: !Sub arn:aws:backup:${AWS::Region}:${AWS::AccountId}:backup-vault:source-dynamodb-${AWS::Region}
-                Lifecycle:
-                  DeleteAfterDays: 1
+              - DestinationBackupVaultArn: !Sub arn:aws:backup:${AWS::Region}:${CentralBackupAccountId}:backup-vault:central-backup-vault
             EnableContinuousBackup: false
             Lifecycle: 
               DeleteAfterDays: !FindInMap [Retention, Primary, !Ref AccountEnvironment]
